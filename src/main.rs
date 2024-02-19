@@ -45,7 +45,7 @@ async fn get_shorten_url(
         Err(e) => { println!("Err: {}", e); return Err(StatusCode::INTERNAL_SERVER_ERROR); }
     }
 
-    Ok(format!("https://localhost:8000/expand/{}", mapping.get_slug()))
+    Ok(format!("https://localhost:8000/e/{}", mapping.get_slug()))
 }
 
 async fn get_expanded_url(
@@ -73,7 +73,7 @@ async fn main() {
     let app = Router::new()
         .route("/", routing::get(|| async { "Hello, World!\n" }))
         .route("/shorten", routing::post(get_shorten_url)).with_state(shared_state.clone())
-        .route("/expand/:slug", routing::get(get_expanded_url)).with_state(shared_state.clone());
+        .route("/e/:slug", routing::get(get_expanded_url)).with_state(shared_state.clone());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
