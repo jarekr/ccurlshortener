@@ -1,6 +1,8 @@
 use const_format::concatcp;
-use rusqlite::{named_params, Connection, Error, OpenFlags};
-use std::path::Path;
+use rusqlite::{named_params, Connection, Error, OpenFlags, OptionalExtension};
+use std::{path::Path, vec};
+
+use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 
 const URL_MAPPINGS_TABLE: &str = "url_mappings";
 const URL_MAPPINGS_DDSQL: &str = concatcp!(
@@ -8,8 +10,8 @@ const URL_MAPPINGS_DDSQL: &str = concatcp!(
     URL_MAPPINGS_TABLE,
     " (
         id INTEGER PRIMARY KEY,
-        long_url TEXT,
-        url_hash INTEGER)"
+        long_url TEXT NOT NULL,
+        url_hash INTEGER NOT NULL UNIQUE)"
 );
 
 const GET_BY_ID_MAPPINGS_SQL: &str = concatcp!(
@@ -31,12 +33,13 @@ const GET_BY_LONG_URL_SQL: &str = concatcp!(
 );
 
 const INSERT_INTO_MAPPINGS_SQL: &str = concatcp!(
-    "INSERT INTO ",
+    "INSERT OR REPLACE INTO ",
     URL_MAPPINGS_TABLE,
     "( long_url, url_hash )
      VALUES ( :long_url, :url_hash )"
 );
 
+pub mod db {
 pub struct Db<'a> {
     path: &'a Path,
 }
@@ -90,7 +93,16 @@ impl UrlMapping {
     }
 
     pub fn get_slug(&self) -> String {
-        format!("{:x}", self.url_hash)
+        URL_SAFE.encode(self.url_hash.to_ne_bytes())
+    }
+
+    pub fn from_slug(slug: String) -> Result<i64, String> {
+        match URL_SAFE.decode(slug) {
+            Ok(vector) => {
+                Ok(i64::from_ne_bytes(vector.as_slice().try_into().expect("incorrect length")))
+            },
+            Err(e) => Err(e.to_string()),
+        }
     }
 
     pub fn insert(db: &Db, mapping: &UrlMapping) -> Result<i64, Error> {
@@ -138,4 +150,5 @@ impl UrlMapping {
             None => None,
         }
     }
+}
 }

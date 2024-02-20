@@ -1,22 +1,23 @@
 use axum::http::{StatusCode, Uri};
-use axum::{ routing, Router,};
+use axum::{ routing, Router, response, Form};
 use rusqlite::{named_params, Connection, Error, OpenFlags};
 
 use axum::extract::{Path, Query, Json, State};
+use serde::de::IntoDeserializer;
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-mod db;
-use db::{ Db, UrlMapping };
+pub mod db;
+use db::backend::{ Db, UrlMapping };
 
-
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, Debug)]
 struct ShortUrlRequest {
-    longUrl: String,
+    pub long_url: String,
 }
+
 
 
 struct AppState<'a> {
@@ -27,8 +28,29 @@ struct AppError {
 
 }
 
+async fn post_shorten_url_form(State(state): State<Arc<AppState<'_>>>, form: Form<ShortUrlRequest>) -> response::Html<String> {
+    let submission = form.0;
+    format!(
+        r#"
+    <!doctype html>
+    <html>
+
+    <head>
+        <title>url shortening</title>
+    </head>
+
+    <body>
+        <h1>shortened url</h1>
+        {:?}
+    </body>
+    </html>
+        "#,
+        &submission.
+    ).into()
+}
+
 async fn get_shorten_url(
-    State(state): State<Arc<AppState<'_>>>, url: String) -> Result<String, StatusCode> {
+    State(state): State<Arc<AppState<'_>>>, url: String) -> Result<String, (StatusCode, String)> {
 
     let mut hasher = DefaultHasher::new();
     for khar in url.as_bytes() {
@@ -40,27 +62,54 @@ async fn get_shorten_url(
 
     println!("got shorten request for {}", url);
 
-    match UrlMapping::insert(&state.db, &mapping) {
-        Ok(_) => (),
-        Err(e) => { println!("Err: {}", e); return Err(StatusCode::INTERNAL_SERVER_ERROR); }
-    }
+    let res = match UrlMapping::insert(&state.db, &mapping) {
+        Ok(r) => r,
+        Err(e) => { println!("Err: {}", e); return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("insert failed: {}", e))); }
+    };
 
-    Ok(format!("https://localhost:8000/e/{}", mapping.get_slug()))
+    println!("inserted slug {} with rowid={}", mapping.get_slug(), res);
+
+    Ok(format!("http://localhost:8000/e/{}\n", mapping.get_slug()))
 }
 
 async fn get_expanded_url(
-    State(state): State<Arc<AppState<'_>>>, Path(slug): Path<String>) -> Result<String, StatusCode> {
+    State(state): State<Arc<AppState<'_>>>, Path(slug): Path<String>) -> Result<response::Redirect, (StatusCode, String)> {
 
-    let url_hash = match i64::from_str_radix(&slug, 16) {
-        Ok(foo) => foo,
-        Err(_) => return Err(StatusCode::BAD_REQUEST),
+    let url_hash = match UrlMapping::from_slug(slug) {
+        Ok(hash) => hash,
+        Err(e) => return Err((StatusCode::BAD_REQUEST, format!("failed to parse slug: {}", e))),
     };
+
     println!("Got request for {}", url_hash);
+
     let result = UrlMapping::query_by_url_hash(&state.db, url_hash);
     match result {
-        Some(mapping) => Ok(mapping.long_url.to_owned()),
-        None => Err(StatusCode::NOT_FOUND)
+        Some(mapping) => Ok(response::Redirect::to(&mapping.long_url)),
+        None => Err((StatusCode::NOT_FOUND, "no mapping for given slug".to_string()))
     }
+}
+
+async fn url_submission_form() -> response::Html<&'static str> {
+    r#"#
+    <!doctype html>
+    <html>
+
+    <head>
+        <title>url shortening</title>
+    </head>
+
+    <body>
+        <h1>shorten your URL here!</h1>
+        <form method="post" action="/shorten">
+        <p>
+            <label for="long_url"> Url: <input name="long_url"></label>
+            <input type="submit">
+        </p>
+        </form>
+
+    </body>
+    </html>
+    #"#.into()
 }
 
 #[tokio::main]
