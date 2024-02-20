@@ -1,4 +1,14 @@
+pub mod web {
+    use const_format::concatcp;
+    pub const HEADER_TEMPLATE: &str = concatcp!("<a href=\"/\">home</a> |");
+    pub const FOOTER_TEMPLATE: &str = concatcp!("<div class=\"footer\">copyright 2024 chunski industries</div>");
+}
 pub mod db {
+    use base64::{engine::general_purpose::URL_SAFE, Engine as _};
+    use const_format::concatcp;
+    use rusqlite::{named_params, Connection, Error, OpenFlags, OptionalExtension};
+    use std::{path::Path, vec};
+
     const URL_MAPPINGS_TABLE: &str = "url_mappings";
     const URL_MAPPINGS_DDSQL: &str = concatcp!(
         "CREATE TABLE IF NOT EXISTS ",
@@ -31,10 +41,6 @@ pub mod db {
      VALUES ( :long_url, :url_hash )"
     );
 
-    use base64::{engine::general_purpose::URL_SAFE, Engine as _};
-    use const_format::concatcp;
-    use rusqlite::{named_params, Connection, Error, OpenFlags, OptionalExtension};
-    use std::{path::Path, vec};
     pub struct Db<'a> {
         path: &'a Path,
     }
@@ -100,7 +106,7 @@ pub mod db {
             }
         }
 
-        pub fn insert(db: &Db, long_url: String, url_hash: i64) -> Result<i64, Error> {
+        pub fn insert(db: &Db, long_url: &String, url_hash: i64) -> Result<i64, Error> {
             let conn = db.connect();
             let mut stmt = conn
                 .prepare(INSERT_INTO_MAPPINGS_SQL)
