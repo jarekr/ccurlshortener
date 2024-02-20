@@ -1,8 +1,8 @@
 
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use const_format::concatcp;
-use rusqlite::{named_params, Connection, Error, OpenFlags, OptionalExtension};
-use std::{path::Path, vec};
+use rusqlite::{named_params, Connection, Error, OpenFlags};
+use std::path::Path;
 
 const URL_MAPPINGS_TABLE: &str = "url_mappings";
 const URL_MAPPINGS_DDSQL: &str = concatcp!(
@@ -23,10 +23,10 @@ const GET_BY_URL_HASH_SQL: &str = concatcp!(
     " where  url_hash = :url_hash"
 );
 
-const GET_BY_LONG_URL_SQL: &str = concatcp!(
+const GET_ALL_URL_MAPPINGS: &str = concatcp!(
     "SELECT * FROM ",
     URL_MAPPINGS_TABLE,
-    " where  long_url = :long_url"
+    " ORDER BY id ASC"
 );
 
 const INSERT_INTO_MAPPINGS_SQL: &str = concatcp!(
@@ -124,9 +124,9 @@ impl UrlMapping {
         }
     }
 
-    pub fn query_by_long_url(db: &Db, long_url: String) -> Result<Vec<UrlMapping>, Error> {
+    pub fn get_all(db: &Db) -> Result<Vec<UrlMapping>, Error> {
         let conn = db.connect();
-        let mut stmt = conn.prepare(GET_BY_LONG_URL_SQL).expect("prepare failed");
+        let mut stmt = conn.prepare(GET_ALL_URL_MAPPINGS).expect("prepare failed");
 
         stmt.query_map([], |r| Ok(UrlMapping::new(r.get(0)?, r.get(1)?, r.get(2)?)))
             .unwrap()

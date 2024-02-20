@@ -1,11 +1,8 @@
-use axum::http::{StatusCode, Uri};
+use axum::http::StatusCode;
 use axum::{response, routing, Form, Router};
-use rusqlite::{named_params, Connection, Error, OpenFlags};
 
-use axum::extract::{Json, Path, Query, State};
-use serde::de::IntoDeserializer;
-use std::collections::HashMap;
-use std::hash::{DefaultHasher, Hash, Hasher};
+use axum::extract::{Path, State};
+use std::hash::{DefaultHasher, Hasher};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -21,26 +18,25 @@ struct ShortUrlRequest {
 
 struct AppState<'a> {
     db: Db<'a>,
+    hostString: String
 }
-
-struct AppError {}
 
 pub fn shorten(url: &String, db: &Db) -> Result<String, String> {
     let mut hasher = DefaultHasher::new();
     for khar in url.as_bytes() {
         hasher.write_u8(*khar);
     }
-    let shortenedUrl = hasher.finish() as i64;
+    let shortened_url = hasher.finish() as i64;
 
     println!("got shorten request for {}", url);
 
-    let res = match UrlMapping::insert(db, url, shortenedUrl) {
+    match UrlMapping::insert(db, url, shortened_url) {
         Ok(r) => r,
         Err(e) => return Err(format!("insert failed: {}", e)),
     };
 
     //println!("inserted slug {} with rowid={}", mapping.get_slug(), res);
-    Ok(UrlMapping::get_slug(shortenedUrl))
+    Ok(UrlMapping::get_slug(shortened_url))
 }
 
 async fn post_shorten_url_form(
@@ -52,13 +48,7 @@ async fn post_shorten_url_form(
     let slug = shorten(&submission.long_url, &state.db).unwrap();
     response::Html(format!(
         r#"
-    <!doctype html>
-    <html>
-    <head>
     {h}
-        <title>url shortening</title>
-    </head>
-
     <body>
         <h1>shortened url</h1>
         <a href="{s}">{s}</a>
@@ -67,12 +57,11 @@ async fn post_shorten_url_form(
         <a href="{o}">{o}</a>
     </body>
     {f}
-    </html>
         "#,
         h = web::HEADER_TEMPLATE,
         f = web::FOOTER_TEMPLATE,
         o = submission.long_url,
-        s = format!("http://localhost:8000/e/{}", slug)
+        s = format!("{}/{}", state.hostString, slug)
     ))
 }
 
@@ -82,7 +71,7 @@ async fn get_shorten_url(
 ) -> Result<String, (StatusCode, String)> {
     let slug = shorten(&url, &state.db).unwrap();
 
-    Ok(format!("http://localhost:8000/e/{}\n", slug))
+    Ok(format!("{}/{}\n", state.hostString, slug))
 }
 
 async fn get_expanded_url(
@@ -111,17 +100,10 @@ async fn get_expanded_url(
     }
 }
 
-async fn url_submission_form(State(state): State<Arc<AppState<'_>>>) -> response::Html<String> {
+async fn url_submission_form() -> response::Html<String> {
     response::Html(format!(
         r#"
-    <!doctype html>
-    <html>
-
-    <head>
     {h}
-        <title>url shortening</title>
-    </head>
-
     <body>
         <h1>shorten your URL here!</h1>
         <form method="post" action="/submit">
@@ -132,35 +114,39 @@ async fn url_submission_form(State(state): State<Arc<AppState<'_>>>) -> response
         </form>
     </body>
     {f}
-    </html>
     "#,
         h = web::HEADER_TEMPLATE,
         f = web::FOOTER_TEMPLATE,
     ))
 }
 
-async fn show_all_slugs(State(state): State<Arc<AppState<'_>>>) -> response::Html<String> {
+async fn show_all_links(State(state): State<Arc<AppState<'_>>>) -> response::Html<String> {
+    let mut links: Vec<String> = Vec::new();
+
+    let mappings_result= UrlMapping::get_all(&state.db);
+
+    if mappings_result.is_ok() {
+        let mappings = mappings_result.expect("error getting mappings");
+        for mapping in mappings {
+            links.push(format!("<tr><td>{l}</td><td><a href='{h}/{s}'>{h}/{s}</a></td></tr>", l = mapping.long_url, h = state.hostString, s = UrlMapping::get_slug(mapping.url_hash)));
+        }
+    } else {
+        links.push("<tr><td>no entries</td></tr>\n".to_string());
+    }
+
+
     response::Html(format!(
         r#"
-    <!doctype html>
-    <html>
-
-    <head>
     {h}
-        <title>url shortening</title>
-    </head>
-
     <body>
         <h1>current shortcuts</h1>
-        <p>
-            <label for="long_url"> Url: <input name="long_url"></label>
-            <input type="submit">
-        </p>
-        </form>
+        <table>
+        {ls}
+        </table>
     </body>
     {f}
-    </html>
     "#,
+        ls = links.join("\n"),
         h = web::HEADER_TEMPLATE,
         f = web::FOOTER_TEMPLATE,
     ))
@@ -171,6 +157,7 @@ async fn main() {
     let dbpath = std::path::Path::new("mappings.db");
     let shared_state = Arc::new(AppState {
         db: Db::new(dbpath),
+        hostString: "http://localhost:8000/e".to_string(),
     });
     shared_state.db.init_schema();
 
@@ -180,6 +167,8 @@ async fn main() {
         .route("/shorten", routing::post(get_shorten_url))
         .with_state(shared_state.clone())
         .route("/submit", routing::post(post_shorten_url_form))
+        .with_state(shared_state.clone())
+        .route("/links", routing::get(show_all_links))
         .with_state(shared_state.clone())
         .route("/e/:slug", routing::get(get_expanded_url))
         .with_state(shared_state.clone());
