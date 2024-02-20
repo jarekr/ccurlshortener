@@ -3,7 +3,9 @@ pub const HEADER_TEMPLATE: &str = concatcp!(
     "<!doctype html>",
     "<html>",
     "<head>",
-    "<a href=\"/\">home</a> | <a href=\"/links\">links</a> | ",
+    "    <link href=\"/assets/main.css\" rel=\"stylesheet\" />",
+    "    <link href=\"https://rsms.me/inter/inter.css\" rel=\"stylesheet\" />",
+    "    <a href=\"/\">home</a> | <a href=\"/links\">links</a> | ",
     "    <title>url shortening</title>",
     "</head>",
 );

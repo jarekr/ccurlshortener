@@ -14,6 +14,8 @@ use backend::db::{Db, UrlMapping};
 
 use backend::web;
 
+use tower_http::services::ServeDir;
+
 #[derive(Deserialize, Serialize, Debug)]
 struct ShortUrlRequest {
     pub long_url: String,
@@ -178,6 +180,8 @@ async fn main() {
 
     info!("logging is up");
 
+    let assets_path =std::env::current_dir().unwrap();
+
     let app = Router::new()
         .route("/", routing::get(url_submission_form))
         .with_state(shared_state.clone())
@@ -188,7 +192,8 @@ async fn main() {
         .route("/links", routing::get(show_all_links))
         .with_state(shared_state.clone())
         .route("/e/:slug", routing::get(get_expanded_url))
-        .with_state(shared_state.clone());
+        .with_state(shared_state.clone())
+        .nest_service("/assets", ServeDir::new(format!("{}/assets", assets_path.to_str().unwrap())));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
     info!("listener is bound");
