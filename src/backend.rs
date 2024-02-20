@@ -87,8 +87,8 @@ pub mod db {
             }
         }
 
-        pub fn get_slug(&self) -> String {
-            URL_SAFE.encode(self.url_hash.to_ne_bytes())
+        pub fn get_slug(url_hash: i64) -> String {
+            URL_SAFE.encode(url_hash.to_ne_bytes())
         }
 
         pub fn from_slug(slug: String) -> Result<i64, String> {
@@ -100,13 +100,13 @@ pub mod db {
             }
         }
 
-        pub fn insert(db: &Db, mapping: &UrlMapping) -> Result<i64, Error> {
+        pub fn insert(db: &Db, long_url: String, url_hash: i64) -> Result<i64, Error> {
             let conn = db.connect();
             let mut stmt = conn
                 .prepare(INSERT_INTO_MAPPINGS_SQL)
                 .expect("prepare failed");
             stmt.insert(
-                named_params! {":long_url": mapping.long_url, ":url_hash": mapping.url_hash },
+                named_params! {":long_url": long_url, ":url_hash": url_hash },
             )
         }
 
