@@ -10,8 +10,8 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-pub mod db;
-use db::backend::{ Db, UrlMapping };
+pub mod backend;
+use backend::db::{ Db, UrlMapping };
 
 #[derive(Deserialize, Serialize, Debug)]
 struct ShortUrlRequest {
