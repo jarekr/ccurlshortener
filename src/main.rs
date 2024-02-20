@@ -173,14 +173,14 @@ async fn main() {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| "ccurlshortener=debug".into()),
+                .unwrap_or_else(|_| "ccurlshortener=debug".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
     info!("logging is up");
 
-    let assets_path =std::env::current_dir().unwrap();
+    let assets_path = std::env::current_dir().unwrap();
 
     let app = Router::new()
         .route("/", routing::get(url_submission_form))
@@ -193,7 +193,10 @@ async fn main() {
         .with_state(shared_state.clone())
         .route("/e/:slug", routing::get(get_expanded_url))
         .with_state(shared_state.clone())
-        .nest_service("/assets", ServeDir::new(format!("{}/assets", assets_path.to_str().unwrap())));
+        .nest_service(
+            "/assets",
+            ServeDir::new(format!("{}/assets", assets_path.to_str().unwrap())),
+        );
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
     info!("listener is bound");
