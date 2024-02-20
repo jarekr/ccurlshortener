@@ -1,8 +1,4 @@
-
 use std::hash::{DefaultHasher, Hash, Hasher};
-
-
-
 
 /*
 pub fn shorten(url: String, db: &Db) -> Result<String, String> {
