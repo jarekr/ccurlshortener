@@ -16,3 +16,9 @@ curl -f -X POST localhost:8000/shorten -d "https://google.com"
 curl -f -X POST localhost:8000/shorten -d "https://lichess.org"
 curl -f -X GET "http://localhost:8000/e/35334e75d4f2a253"
 curl -f -X GET "http://localhost:8000/e/77d4885785192f11"
+
+
+pnpm dlx tailwindcss -i styles/tailwind.css -o assets/main.css --watch
+
+pnpm dlx tailwindcss init
+
