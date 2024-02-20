@@ -9,9 +9,9 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-
-pub mod backend;
+mod backend;
 use backend::db::{ Db, UrlMapping };
+
 use backend::web;
 
 #[derive(Deserialize, Serialize, Debug)]
