@@ -134,7 +134,7 @@ async fn show_all_links(State(state): State<Arc<AppState<'_>>>) -> response::Htm
         let mappings = mappings_result.expect("error getting mappings");
         for mapping in mappings {
             links.push(format!(
-                "<tr><td>{l}</td><td><a href='{h}/{s}'>{h}/{s}</a></td></tr>",
+                "<tr><td>{l}</td><td><a href='{h}/{s}' target='_blank'>{h}/{s}</a></td></tr>",
                 l = mapping.long_url,
                 h = state.hostString,
                 s = UrlMapping::get_slug(mapping.url_hash)
