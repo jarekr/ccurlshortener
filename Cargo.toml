@@ -12,3 +12,5 @@ const_format = "0.2.32"
 rusqlite = "0.31.0"
 serde = { version = "1.0.196", features = ["derive"] }
 tokio = { version = "1.36.0", features = ["full"] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

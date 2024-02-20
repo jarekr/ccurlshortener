@@ -1,3 +1,6 @@
+use tracing::info;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
 use axum::http::StatusCode;
 use axum::{response, routing, Form, Router};
 
@@ -165,6 +168,16 @@ async fn main() {
     });
     shared_state.db.init_schema();
 
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| "ccurlshortener=debug".into()),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
+    info!("logging is up");
+
     let app = Router::new()
         .route("/", routing::get(url_submission_form))
         .with_state(shared_state.clone())
@@ -178,5 +191,6 @@ async fn main() {
         .with_state(shared_state.clone());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
+    info!("listener is bound");
     axum::serve(listener, app).await.unwrap();
 }
