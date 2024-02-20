@@ -1,4 +1,3 @@
-
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use const_format::concatcp;
 use rusqlite::{named_params, Connection, Error, OpenFlags};
@@ -23,11 +22,8 @@ const GET_BY_URL_HASH_SQL: &str = concatcp!(
     " where  url_hash = :url_hash"
 );
 
-const GET_ALL_URL_MAPPINGS: &str = concatcp!(
-    "SELECT * FROM ",
-    URL_MAPPINGS_TABLE,
-    " ORDER BY id ASC"
-);
+const GET_ALL_URL_MAPPINGS: &str =
+    concatcp!("SELECT * FROM ", URL_MAPPINGS_TABLE, " ORDER BY id ASC");
 
 const INSERT_INTO_MAPPINGS_SQL: &str = concatcp!(
     "INSERT OR REPLACE INTO ",

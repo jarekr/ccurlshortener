@@ -18,7 +18,7 @@ struct ShortUrlRequest {
 
 struct AppState<'a> {
     db: Db<'a>,
-    hostString: String
+    hostString: String,
 }
 
 pub fn shorten(url: &String, db: &Db) -> Result<String, String> {
@@ -123,17 +123,21 @@ async fn url_submission_form() -> response::Html<String> {
 async fn show_all_links(State(state): State<Arc<AppState<'_>>>) -> response::Html<String> {
     let mut links: Vec<String> = Vec::new();
 
-    let mappings_result= UrlMapping::get_all(&state.db);
+    let mappings_result = UrlMapping::get_all(&state.db);
 
     if mappings_result.is_ok() {
         let mappings = mappings_result.expect("error getting mappings");
         for mapping in mappings {
-            links.push(format!("<tr><td>{l}</td><td><a href='{h}/{s}'>{h}/{s}</a></td></tr>", l = mapping.long_url, h = state.hostString, s = UrlMapping::get_slug(mapping.url_hash)));
+            links.push(format!(
+                "<tr><td>{l}</td><td><a href='{h}/{s}'>{h}/{s}</a></td></tr>",
+                l = mapping.long_url,
+                h = state.hostString,
+                s = UrlMapping::get_slug(mapping.url_hash)
+            ));
         }
     } else {
         links.push("<tr><td>no entries</td></tr>\n".to_string());
     }
-
 
     response::Html(format!(
         r#"

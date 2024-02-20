@@ -7,5 +7,7 @@ pub const HEADER_TEMPLATE: &str = concatcp!(
     "    <title>url shortening</title>",
     "</head>",
 );
-pub const FOOTER_TEMPLATE: &str =
-    concatcp!("<div class=\"footer\">copyright 2024 chunski industries</div>", "</html>");
+pub const FOOTER_TEMPLATE: &str = concatcp!(
+    "<div class=\"footer\">copyright 2024 chunski industries</div>",
+    "</html>"
+);
