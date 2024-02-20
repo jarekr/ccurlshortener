@@ -1,8 +1,8 @@
 use axum::http::{StatusCode, Uri};
-use axum::{ routing, Router, response, Form};
+use axum::{response, routing, Form, Router};
 use rusqlite::{named_params, Connection, Error, OpenFlags};
 
-use axum::extract::{Path, Query, Json, State};
+use axum::extract::{Json, Path, Query, State};
 use serde::de::IntoDeserializer;
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 mod backend;
-use backend::db::{ Db, UrlMapping };
+use backend::db::{Db, UrlMapping};
 
 use backend::web;
 
@@ -19,15 +19,11 @@ struct ShortUrlRequest {
     pub long_url: String,
 }
 
-
-
 struct AppState<'a> {
-    db: Db<'a>
+    db: Db<'a>,
 }
 
-struct AppError {
-
-}
+struct AppError {}
 
 pub fn shorten(url: &String, db: &Db) -> Result<String, String> {
     let mut hasher = DefaultHasher::new();
@@ -40,14 +36,17 @@ pub fn shorten(url: &String, db: &Db) -> Result<String, String> {
 
     let res = match UrlMapping::insert(db, url, shortenedUrl) {
         Ok(r) => r,
-        Err(e) => return Err(format!("insert failed: {}", e))
+        Err(e) => return Err(format!("insert failed: {}", e)),
     };
 
     //println!("inserted slug {} with rowid={}", mapping.get_slug(), res);
     Ok(UrlMapping::get_slug(shortenedUrl))
 }
 
-async fn post_shorten_url_form(State(state): State<Arc<AppState<'_>>>, form: Form<ShortUrlRequest>) -> response::Html<String> {
+async fn post_shorten_url_form(
+    State(state): State<Arc<AppState<'_>>>,
+    form: Form<ShortUrlRequest>,
+) -> response::Html<String> {
     let submission = form.0;
 
     let slug = shorten(&submission.long_url, &state.db).unwrap();
@@ -70,27 +69,34 @@ async fn post_shorten_url_form(State(state): State<Arc<AppState<'_>>>, form: For
     {f}
     </html>
         "#,
-        h=web::HEADER_TEMPLATE,
-        f=web::FOOTER_TEMPLATE,
-        o=submission.long_url,
-        s=format!("http://localhost:8000/e/{}", slug)
+        h = web::HEADER_TEMPLATE,
+        f = web::FOOTER_TEMPLATE,
+        o = submission.long_url,
+        s = format!("http://localhost:8000/e/{}", slug)
     ))
 }
 
 async fn get_shorten_url(
-    State(state): State<Arc<AppState<'_>>>, url: String) -> Result<String, (StatusCode, String)> {
-
-        let slug = shorten(&url, &state.db).unwrap();
+    State(state): State<Arc<AppState<'_>>>,
+    url: String,
+) -> Result<String, (StatusCode, String)> {
+    let slug = shorten(&url, &state.db).unwrap();
 
     Ok(format!("http://localhost:8000/e/{}\n", slug))
 }
 
 async fn get_expanded_url(
-    State(state): State<Arc<AppState<'_>>>, Path(slug): Path<String>) -> Result<response::Redirect, (StatusCode, String)> {
-
+    State(state): State<Arc<AppState<'_>>>,
+    Path(slug): Path<String>,
+) -> Result<response::Redirect, (StatusCode, String)> {
     let url_hash = match UrlMapping::from_slug(slug) {
         Ok(hash) => hash,
-        Err(e) => return Err((StatusCode::BAD_REQUEST, format!("failed to parse slug: {}", e))),
+        Err(e) => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("failed to parse slug: {}", e),
+            ))
+        }
     };
 
     println!("Got request for {}", url_hash);
@@ -98,12 +104,16 @@ async fn get_expanded_url(
     let result = UrlMapping::query_by_url_hash(&state.db, url_hash);
     match result {
         Some(mapping) => Ok(response::Redirect::to(&mapping.long_url)),
-        None => Err((StatusCode::NOT_FOUND, "no mapping for given slug".to_string()))
+        None => Err((
+            StatusCode::NOT_FOUND,
+            "no mapping for given slug".to_string(),
+        )),
     }
 }
 
 async fn url_submission_form(State(state): State<Arc<AppState<'_>>>) -> response::Html<String> {
-    response::Html(format!(r#"
+    response::Html(format!(
+        r#"
     <!doctype html>
     <html>
 
@@ -124,15 +134,14 @@ async fn url_submission_form(State(state): State<Arc<AppState<'_>>>) -> response
     {f}
     </html>
     "#,
-    h=web::HEADER_TEMPLATE,
-    f=web::FOOTER_TEMPLATE,
+        h = web::HEADER_TEMPLATE,
+        f = web::FOOTER_TEMPLATE,
     ))
 }
 
-async fn show_all_slugs (State(state): State<Arc<AppState<'_>>>) -> response::Html<String> {
-
-
-    response::Html(format!(r#"
+async fn show_all_slugs(State(state): State<Arc<AppState<'_>>>) -> response::Html<String> {
+    response::Html(format!(
+        r#"
     <!doctype html>
     <html>
 
@@ -152,23 +161,28 @@ async fn show_all_slugs (State(state): State<Arc<AppState<'_>>>) -> response::Ht
     {f}
     </html>
     "#,
-    h=web::HEADER_TEMPLATE,
-    f=web::FOOTER_TEMPLATE,
+        h = web::HEADER_TEMPLATE,
+        f = web::FOOTER_TEMPLATE,
     ))
 }
 
 #[tokio::main]
 async fn main() {
-
     let dbpath = std::path::Path::new("mappings.db");
-    let shared_state = Arc::new(AppState { db: Db::new(dbpath) });
+    let shared_state = Arc::new(AppState {
+        db: Db::new(dbpath),
+    });
     shared_state.db.init_schema();
 
     let app = Router::new()
-        .route("/", routing::get(url_submission_form)).with_state(shared_state.clone())
-        .route("/shorten", routing::post(get_shorten_url)).with_state(shared_state.clone())
-        .route("/submit", routing::post(post_shorten_url_form)).with_state(shared_state.clone())
-        .route("/e/:slug", routing::get(get_expanded_url)).with_state(shared_state.clone());
+        .route("/", routing::get(url_submission_form))
+        .with_state(shared_state.clone())
+        .route("/shorten", routing::post(get_shorten_url))
+        .with_state(shared_state.clone())
+        .route("/submit", routing::post(post_shorten_url_form))
+        .with_state(shared_state.clone())
+        .route("/e/:slug", routing::get(get_expanded_url))
+        .with_state(shared_state.clone());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
