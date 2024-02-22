@@ -28,7 +28,7 @@ curl -i -X POST localhost:8000/shorten -d "https://lichess.org"
 
 # fetch some known shortened urls
 ```
-curl -i -X GET "http://localhost:8000/e/35334e75d4f2a253"
-curl -i -X GET "http://localhost:8000/e/77d4885785192f11"
+curl -i -X GET "http://localhost:8000/e/wuTpmLjPu_Q="
+curl -i -X GET "http://localhost:8000/e/ES8ZhVeI1Hc="
 ```
 
