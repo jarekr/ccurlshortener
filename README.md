@@ -2,6 +2,8 @@
 
 This is a subbmission for https://codingchallenges.fyi/challenges/challenge-url-shortener
 
+Still a work in progress, e.g. no ability to delete shortened URLs. 
+
 ## Building
 
 ```
