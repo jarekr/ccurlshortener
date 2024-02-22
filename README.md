@@ -4,21 +4,24 @@ This is a subbmission for https://codingchallenges.fyi/challenges/challenge-url-
 
 ## Building
 
+```
 cargo build
+```
 
 ## Running
 
-runs on http://localhost:8000
-
+```
 cargo run
+```
 
-curl -f -X POST localhost:8000/shorten -d "https://google.com"
-curl -f -X POST localhost:8000/shorten -d "https://lichess.org"
-curl -f -X GET "http://localhost:8000/e/35334e75d4f2a253"
-curl -f -X GET "http://localhost:8000/e/77d4885785192f11"
+Go to http://localhost:8000 to see the web ui. Can also hit api endpoints like
+so:
 
+# add shortened urls for some websites
+curl -i -X POST localhost:8000/shorten -d "https://google.com"
+curl -i -X POST localhost:8000/shorten -d "https://lichess.org"
 
-pnpm dlx tailwindcss -i styles/tailwind.css -o assets/main.css --watch
-
-pnpm dlx tailwindcss init
+# fetch some known shortened urls
+curl -i -X GET "http://localhost:8000/e/35334e75d4f2a253"
+curl -i -X GET "http://localhost:8000/e/77d4885785192f11"
 
