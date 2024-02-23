@@ -19,11 +19,18 @@ const GET_BY_ID_MAPPINGS_SQL: &str =
 const GET_BY_URL_HASH_SQL: &str = concatcp!(
     "SELECT * FROM ",
     URL_MAPPINGS_TABLE,
-    " where  url_hash = :url_hash"
+    " WHERE  url_hash = :url_hash"
 );
 
 const GET_ALL_URL_MAPPINGS: &str =
     concatcp!("SELECT * FROM ", URL_MAPPINGS_TABLE, " ORDER BY id ASC");
+
+const DELETE_FROM_MAPPINGS_SQL: &str = concatcp!(
+    "DELETE FROM ",
+    URL_MAPPINGS_TABLE,
+    " WHERE url_hash = :url_hash"
+
+);
 
 const INSERT_INTO_MAPPINGS_SQL: &str = concatcp!(
     "INSERT OR REPLACE INTO ",
@@ -88,7 +95,7 @@ impl UrlMapping {
         URL_SAFE.encode(url_hash.to_ne_bytes())
     }
 
-    pub fn from_slug(slug: String) -> Result<i64, String> {
+    pub fn slug_to_int(slug: &String) -> Result<i64, String> {
         match URL_SAFE.decode(slug) {
             Ok(vector) => Ok(i64::from_ne_bytes(
                 vector.as_slice().try_into().expect("incorrect length"),
@@ -103,6 +110,17 @@ impl UrlMapping {
             .prepare(INSERT_INTO_MAPPINGS_SQL)
             .expect("prepare failed");
         stmt.insert(named_params! {":long_url": long_url, ":url_hash": url_hash })
+    }
+
+    pub fn delete(db: &Db, url_hash: i64) -> bool {
+        let conn = db.connect();
+        let mut stmt = conn.prepare(DELETE_FROM_MAPPINGS_SQL)
+                .expect("prepare failed");
+
+        match stmt.execute(named_params! {":url_hash": url_hash}) {
+            Ok(f) => f > 0,
+            Err(e) => false,
+        }
     }
 
     pub fn query_by_url_hash(db: &Db, url_hash: i64) -> Option<UrlMapping> {

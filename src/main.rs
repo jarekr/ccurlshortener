@@ -5,8 +5,10 @@ use axum::http::StatusCode;
 use axum::{response, routing, Form, Router};
 
 use axum::extract::{Path, State};
+use std::fmt::format;
 use std::hash::{DefaultHasher, Hasher};
 use std::sync::Arc;
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 mod backend;
@@ -19,6 +21,11 @@ use tower_http::services::ServeDir;
 #[derive(Deserialize, Serialize, Debug)]
 struct ShortUrlRequest {
     pub long_url: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct UrlDeleteRequest {
+    pub url_hashes: String
 }
 
 struct AppState<'a> {
@@ -42,6 +49,41 @@ pub fn shorten(url: &String, db: &Db) -> Result<String, String> {
 
     //println!("inserted slug {} with rowid={}", mapping.get_slug(), res);
     Ok(UrlMapping::get_slug(shortened_url))
+}
+
+async fn post_delete_url_form(
+    State(state): State<Arc<AppState<'_>>>,
+    form: Form<HashMap<String,String>>
+) -> response::Html<String> {
+    let mut result: Vec<String> = Vec::new();
+
+    for foo in form.keys() {
+        match UrlMapping::slug_to_int(foo) {
+            Ok(hash) => {
+                let bar = UrlMapping::delete(&state.db, hash);
+                result.push(format!("{}: {}", bar, foo));
+            },
+            Err(e) => {
+                result.push(format!("Err: {} {}", foo, e.to_string()));
+            },
+        }
+    };
+
+    response::Html(format!(
+        r#"
+    {h}
+    <body>
+        <h1>delete results</h1>
+        <br/>
+        {o}
+        <br/>
+    </body>
+    {f}
+        "#,
+        h = web::HEADER_TEMPLATE,
+        f = web::FOOTER_TEMPLATE,
+        o = result.join("<br/>")
+    ))
 }
 
 async fn post_shorten_url_form(
@@ -79,11 +121,34 @@ async fn get_shorten_url(
     Ok(format!("{}/{}\n", state.hostString, slug))
 }
 
+async fn delete_slug(
+    State(state): State<Arc<AppState<'_>>>,
+    Path(slug): Path<String>,
+) -> StatusCode {
+    let url_hash = match UrlMapping::slug_to_int(&slug) {
+        Ok(hash) => hash,
+        Err(e) => return StatusCode::BAD_REQUEST,
+    };
+
+    println!("Got delete request for {} / {}", url_hash, slug);
+
+    let result = UrlMapping::query_by_url_hash(&state.db, url_hash);
+    match result {
+        Some(mapping) => {
+            match UrlMapping::delete(&state.db, url_hash) {
+                true => StatusCode::OK,
+                false => StatusCode::NOT_FOUND,
+            }
+        }
+        None => StatusCode::NOT_FOUND
+    }
+}
+
 async fn get_expanded_url(
     State(state): State<Arc<AppState<'_>>>,
     Path(slug): Path<String>,
 ) -> Result<response::Redirect, (StatusCode, String)> {
-    let url_hash = match UrlMapping::from_slug(slug) {
+    let url_hash = match UrlMapping::slug_to_int(&slug) {
         Ok(hash) => hash,
         Err(e) => {
             return Err((
@@ -114,7 +179,7 @@ async fn url_submission_form() -> response::Html<String> {
         <form method="post" action="/submit">
         <p>
             <label for="long_url"> Url: <input name="long_url"></label>
-            <input type="submit">
+            <input type="submit" value="shorten"/>
         </p>
         </form>
     </body>
@@ -134,12 +199,13 @@ async fn show_all_links(State(state): State<Arc<AppState<'_>>>) -> response::Htm
         let mappings = mappings_result.expect("error getting mappings");
         for mapping in mappings {
             links.push(format!(
-                "<tr><td>{l}</td><td><a href='{h}/{s}' target='_blank'>{h}/{s}</a></td></tr>",
+                "<tr><td><input type='checkbox' name='{s}' value='{s}'/></td><td>{l}</td><td><a href='{h}/{s}' target='_blank'>{h}/{s}</a></td></tr>",
                 l = mapping.long_url,
                 h = state.hostString,
                 s = UrlMapping::get_slug(mapping.url_hash)
             ));
         }
+        links.push("<input type='submit' value='delete'/>".to_string());
     } else {
         links.push("<tr><td>no entries</td></tr>\n".to_string());
     }
@@ -149,9 +215,11 @@ async fn show_all_links(State(state): State<Arc<AppState<'_>>>) -> response::Htm
     {h}
     <body>
         <h1>current shortcuts</h1>
+        <form method="post" action="/delete">
         <table>
         {ls}
         </table>
+        </form>
     </body>
     {f}
     "#,
@@ -189,9 +257,13 @@ async fn main() {
         .with_state(shared_state.clone())
         .route("/submit", routing::post(post_shorten_url_form))
         .with_state(shared_state.clone())
+        .route("/delete", routing::post(post_delete_url_form))
+        .with_state(shared_state.clone())
         .route("/links", routing::get(show_all_links))
         .with_state(shared_state.clone())
         .route("/e/:slug", routing::get(get_expanded_url))
+        .with_state(shared_state.clone())
+        .route("/d/:slug", routing::delete(delete_slug))
         .with_state(shared_state.clone())
         .nest_service(
             "/assets",
