@@ -5,10 +5,10 @@ use axum::http::StatusCode;
 use axum::{response, routing, Form, Router};
 
 use axum::extract::{Path, State};
+use std::collections::HashMap;
 use std::fmt::format;
 use std::hash::{DefaultHasher, Hasher};
 use std::sync::Arc;
-use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 mod backend;
@@ -25,7 +25,7 @@ struct ShortUrlRequest {
 
 #[derive(Deserialize, Serialize, Debug)]
 struct UrlDeleteRequest {
-    pub url_hashes: String
+    pub url_hashes: String,
 }
 
 struct AppState<'a> {
@@ -53,7 +53,7 @@ pub fn shorten(url: &String, db: &Db) -> Result<String, String> {
 
 async fn post_delete_url_form(
     State(state): State<Arc<AppState<'_>>>,
-    form: Form<HashMap<String,String>>
+    form: Form<HashMap<String, String>>,
 ) -> response::Html<String> {
     let mut result: Vec<String> = Vec::new();
 
@@ -62,12 +62,12 @@ async fn post_delete_url_form(
             Ok(hash) => {
                 let bar = UrlMapping::delete(&state.db, hash);
                 result.push(format!("{}: {}", bar, foo));
-            },
+            }
             Err(e) => {
                 result.push(format!("Err: {} {}", foo, e.to_string()));
-            },
+            }
         }
-    };
+    }
 
     response::Html(format!(
         r#"
@@ -134,13 +134,11 @@ async fn delete_slug(
 
     let result = UrlMapping::query_by_url_hash(&state.db, url_hash);
     match result {
-        Some(mapping) => {
-            match UrlMapping::delete(&state.db, url_hash) {
-                true => StatusCode::OK,
-                false => StatusCode::NOT_FOUND,
-            }
-        }
-        None => StatusCode::NOT_FOUND
+        Some(mapping) => match UrlMapping::delete(&state.db, url_hash) {
+            true => StatusCode::OK,
+            false => StatusCode::NOT_FOUND,
+        },
+        None => StatusCode::NOT_FOUND,
     }
 }
 

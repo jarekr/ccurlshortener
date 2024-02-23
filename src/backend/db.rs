@@ -29,7 +29,6 @@ const DELETE_FROM_MAPPINGS_SQL: &str = concatcp!(
     "DELETE FROM ",
     URL_MAPPINGS_TABLE,
     " WHERE url_hash = :url_hash"
-
 );
 
 const INSERT_INTO_MAPPINGS_SQL: &str = concatcp!(
@@ -114,8 +113,9 @@ impl UrlMapping {
 
     pub fn delete(db: &Db, url_hash: i64) -> bool {
         let conn = db.connect();
-        let mut stmt = conn.prepare(DELETE_FROM_MAPPINGS_SQL)
-                .expect("prepare failed");
+        let mut stmt = conn
+            .prepare(DELETE_FROM_MAPPINGS_SQL)
+            .expect("prepare failed");
 
         match stmt.execute(named_params! {":url_hash": url_hash}) {
             Ok(f) => f > 0,
