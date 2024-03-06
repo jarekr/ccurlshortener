@@ -10,7 +10,27 @@ const URL_MAPPINGS_DDSQL: &str = concatcp!(
     " (
         id INTEGER PRIMARY KEY,
         long_url TEXT NOT NULL,
-        url_hash INTEGER NOT NULL UNIQUE)"
+        url_hash INTEGER NOT NULL UNIQUE,
+        created_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+    )"
+);
+
+const URL_MAPPINGS_INFO_TABLE: &str = "url_mappings_info";
+const URL_MAPPINGS_INFO_DDSQL: &str = concatcp!(
+    "CREATE TABLE IF NOT EXISTS ",
+    URL_MAPPINGS_INFO_TABLE,
+    " (
+        id INTEGER PRIMARY KEY,
+        mappings_id INTEGER NOT NULL,
+        created_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        requested_from TEXT,
+        duplicate_requests INTEGER NOT NULL DEFAULT 0,
+        redirects_served INTEGER NOT NULL DEFAULT 0,
+        marked_for_deletion TIMESTAMP,
+        FOREIGN KEY(mappings_id) REFERENCES ",
+        URL_MAPPINGS_TABLE,
+        "(id)
+    )"
 );
 
 const GET_BY_ID_MAPPINGS_SQL: &str =
@@ -62,7 +82,7 @@ impl Db<'_> {
 
     pub fn init_schema(&self) -> () {
         let conn = self.connect();
-        for sql in [URL_MAPPINGS_DDSQL] {
+        for sql in [URL_MAPPINGS_DDSQL, URL_MAPPINGS_INFO_DDSQL] {
             self.create_schema(&conn, sql);
         }
     }
@@ -79,6 +99,17 @@ pub struct UrlMapping {
     pub id: i64,
     pub long_url: String,
     pub url_hash: i64,
+}
+
+pub struct UrlMappingInfo {
+    pub id: i64,
+    pub mappings_id: i64,
+    pub created_on: String,
+    pub requested_from: Option<String>,
+    pub duplicate_requests: i64,
+    pub redirects_served: i64,
+    pub marked_for_deletion: Option<String>,
+
 }
 
 impl UrlMapping {

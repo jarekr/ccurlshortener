@@ -28,10 +28,26 @@ struct UrlDeleteRequest {
     pub url_hashes: String
 }
 
+struct Config {
+    hostname: &'static str,
+    proto: &'static str,
+    port: u16,
+}
 struct AppState<'a> {
     db: Db<'a>,
-    hostString: String,
+    config: &'a Config,
+    redirects_served: i64,
 }
+
+impl AppState<'_> {
+    pub fn hostString(&self) -> String {
+        match self.config.port  {
+            443 => String::new(),
+            port => format!("{}:{}", &self.config.hostname, &self.config.port),
+        }
+    }
+}
+
 
 pub fn shorten(url: &String, db: &Db) -> Result<String, String> {
     let mut hasher = DefaultHasher::new();
@@ -108,7 +124,7 @@ async fn post_shorten_url_form(
         h = web::HEADER_TEMPLATE,
         f = web::FOOTER_TEMPLATE,
         o = submission.long_url,
-        s = format!("{}/{}", state.hostString, slug)
+        s = format!("{}/{}", state.hostString(), slug)
     ))
 }
 
@@ -118,7 +134,7 @@ async fn get_shorten_url(
 ) -> Result<String, (StatusCode, String)> {
     let slug = shorten(&url, &state.db).unwrap();
 
-    Ok(format!("{}/{}\n", state.hostString, slug))
+    Ok(format!("{}/e/{}\n", state.hostString(), slug))
 }
 
 async fn delete_slug(
@@ -201,7 +217,7 @@ async fn show_all_links(State(state): State<Arc<AppState<'_>>>) -> response::Htm
             links.push(format!(
                 "<tr><td><input type='checkbox' name='{s}' value='{s}'/></td><td><a href='{h}/{s}' target='_blank'>{s}</a></td><td>{l}</td></tr>",
                 l = mapping.long_url,
-                h = state.hostString,
+                h = state.hostString(),
                 s = UrlMapping::get_slug(mapping.url_hash)
             ));
         }
@@ -232,9 +248,17 @@ async fn show_all_links(State(state): State<Arc<AppState<'_>>>) -> response::Htm
 #[tokio::main]
 async fn main() {
     let dbpath = std::path::Path::new("mappings.db");
+
+    let config: &'static Arc<Config> = &Arc::new(&Config {
+        hostname: "localhost",
+        port: 8443,
+        proto: "http",
+    });
+
     let shared_state = Arc::new(AppState {
         db: Db::new(dbpath),
-        hostString: "http://localhost:8000/e".to_string(),
+        config: config.as_ref(),
+        redirects_served: 0,
     });
     shared_state.db.init_schema();
 
@@ -270,7 +294,8 @@ async fn main() {
             ServeDir::new(format!("{}/assets", assets_path.to_str().unwrap())),
         );
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
-    info!("listening at http://localhost:8000");
+    let address_and_port = format!("0.0.0.0:{}", &config.port);
+    let listener = tokio::net::TcpListener::bind(&address_and_port).await.unwrap();
+    info!("listening at http://localhost:{}", &config.port);
     axum::serve(listener, app).await.unwrap();
 }

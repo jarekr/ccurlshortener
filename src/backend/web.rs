@@ -9,6 +9,6 @@ pub const HEADER_TEMPLATE: &str = concatcp!(
     "</head>",
 );
 pub const FOOTER_TEMPLATE: &str = concatcp!(
-    "<div class=\"footer\">copyright 2024 chunski industries</div>",
+    "<div class=\"footer\">&copy; 2024 chunski industries; omnia jura reservata, omnia pruna conservata</div>",
     "</html>"
 );
