@@ -88,12 +88,10 @@ async fn post_delete_url_form(
     response::Html(format!(
         r#"
     {h}
-    <body>
         <h1>delete results</h1>
         <br/>
         {o}
         <br/>
-    </body>
     {f}
         "#,
         h = web::HEADER_TEMPLATE,
@@ -112,13 +110,11 @@ async fn post_shorten_url_form(
     response::Html(format!(
         r#"
     {h}
-    <body>
         <h1>shortened url</h1>
         <a href="{s}">{s}</a>
         <p/>
         <h3>original url:</h3>
         <a href="{o}">{o}</a>
-    </body>
     {f}
         "#,
         h = web::HEADER_TEMPLATE,
@@ -160,7 +156,7 @@ async fn delete_slug(
     }
 }
 
-async fn get_expanded_url(
+async fn serve_redirect(
     State(state): State<Arc<AppState<'_>>>,
     Path(slug): Path<String>,
 ) -> Result<response::Redirect, (StatusCode, String)> {
@@ -178,7 +174,9 @@ async fn get_expanded_url(
 
     let result = UrlMapping::query_by_url_hash(&state.db, url_hash);
     match result {
-        Some(mapping) => Ok(response::Redirect::to(&mapping.long_url)),
+        Some(mapping) => {
+            return Ok(response::Redirect::to(&mapping.long_url));
+        }
         None => Err((
             StatusCode::NOT_FOUND,
             "no mapping for given slug".to_string(),
@@ -190,7 +188,6 @@ async fn url_submission_form() -> response::Html<String> {
     response::Html(format!(
         r#"
     {h}
-    <body>
         <h1>shorten your URL here!</h1>
         <form method="post" action="/submit">
         <p>
@@ -198,7 +195,6 @@ async fn url_submission_form() -> response::Html<String> {
             <input type="submit" value="shorten"/>
         </p>
         </form>
-    </body>
     {f}
     "#,
         h = web::HEADER_TEMPLATE,
@@ -221,7 +217,6 @@ async fn show_all_links(State(state): State<Arc<AppState<'_>>>) -> response::Htm
                 s = UrlMapping::get_slug(mapping.url_hash)
             ));
         }
-        links.push("<input type='submit' value='delete'/>".to_string());
     } else {
         links.push("<tr><td>no entries</td></tr>\n".to_string());
     }
@@ -229,14 +224,13 @@ async fn show_all_links(State(state): State<Arc<AppState<'_>>>) -> response::Htm
     response::Html(format!(
         r#"
     {h}
-    <body>
         <h1>current shortcuts</h1>
         <form method="post" action="/delete">
         <table>
         {ls}
         </table>
+        <input type='submit' value='delete'/>
         </form>
-    </body>
     {f}
     "#,
         ls = links.join("\n"),
@@ -249,15 +243,15 @@ async fn show_all_links(State(state): State<Arc<AppState<'_>>>) -> response::Htm
 async fn main() {
     let dbpath = std::path::Path::new("mappings.db");
 
-    let config: &'static Arc<Config> = &Arc::new(&Config {
+    let config: &'static Config = &Config {
         hostname: "localhost",
         port: 8443,
         proto: "http",
-    });
+    };
 
     let shared_state = Arc::new(AppState {
         db: Db::new(dbpath),
-        config: config.as_ref(),
+        config: &config,
         redirects_served: 0,
     });
     shared_state.db.init_schema();
@@ -285,7 +279,7 @@ async fn main() {
         .with_state(shared_state.clone())
         .route("/links", routing::get(show_all_links))
         .with_state(shared_state.clone())
-        .route("/e/:slug", routing::get(get_expanded_url))
+        .route("/e/:slug", routing::get(serve_redirect))
         .with_state(shared_state.clone())
         .route("/d/:slug", routing::delete(delete_slug))
         .with_state(shared_state.clone())

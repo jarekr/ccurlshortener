@@ -7,8 +7,10 @@ pub const HEADER_TEMPLATE: &str = concatcp!(
     "    <a href=\"/\">home</a> | <a href=\"/links\">links</a>",
     "    <title>url shortening</title>",
     "</head>",
+    "<body>",
 );
 pub const FOOTER_TEMPLATE: &str = concatcp!(
     "<div class=\"footer\">&copy; 2024 chunski industries; omnia jura reservata, omnia pruna conservata</div>",
+    "</body>",
     "</html>"
 );
