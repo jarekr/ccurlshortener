@@ -36,7 +36,6 @@ struct Config {
 struct AppState<'a> {
     db: Db<'a>,
     config: &'a Config,
-    redirects_served: i64,
 }
 
 impl AppState<'_> {
@@ -47,7 +46,6 @@ impl AppState<'_> {
         }
     }
 }
-
 
 pub fn shorten(url: &String, db: &Db) -> Result<String, String> {
     let mut hasher = DefaultHasher::new();
@@ -120,8 +118,12 @@ async fn post_shorten_url_form(
         h = web::HEADER_TEMPLATE,
         f = web::FOOTER_TEMPLATE,
         o = submission.long_url,
-        s = format!("{}/{}", state.hostString(), slug)
+        s = short_url(state.config.proto, &state.hostString(), &slug)
     ))
+}
+
+fn short_url(proto: &str, host: &String, slug: &String) -> String {
+    format!("{}://{}/e/{}", proto, host, slug)
 }
 
 async fn get_shorten_url(
@@ -130,7 +132,7 @@ async fn get_shorten_url(
 ) -> Result<String, (StatusCode, String)> {
     let slug = shorten(&url, &state.db).unwrap();
 
-    Ok(format!("{}/e/{}\n", state.hostString(), slug))
+    Ok(short_url(state.config.proto, &state.hostString(), &slug))
 }
 
 async fn delete_slug(
@@ -210,11 +212,17 @@ async fn show_all_links(State(state): State<Arc<AppState<'_>>>) -> response::Htm
     if mappings_result.is_ok() {
         let mappings = mappings_result.expect("error getting mappings");
         for mapping in mappings {
+            //let host_string = &state.hostString();
+            let host_string = &mapping.get_host();
+            let slug = &UrlMapping::get_slug(mapping.url_hash);
+
             links.push(format!(
-                "<tr><td><input type='checkbox' name='{s}' value='{s}'/></td><td><a href='{h}/{s}' target='_blank'>{s}</a></td><td>{l}</td></tr>",
+                "<tr><td><input type='checkbox' name='{s}' value='{s}'/></td>
+                <td>{h}</td><td><a href='{sl}' target='_blank'>{s}</a></td><td>{l}</td></tr>",
                 l = mapping.long_url,
-                h = state.hostString(),
-                s = UrlMapping::get_slug(mapping.url_hash)
+                h = host_string,
+                s = slug,
+                sl = short_url(state.config.proto, &state.hostString(), slug)
             ));
         }
     } else {
@@ -252,7 +260,6 @@ async fn main() {
     let shared_state = Arc::new(AppState {
         db: Db::new(dbpath),
         config: &config,
-        redirects_served: 0,
     });
     shared_state.db.init_schema();
 

@@ -2,6 +2,7 @@ use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use const_format::concatcp;
 use rusqlite::{named_params, Connection, Error, OpenFlags};
 use std::path::Path;
+use url::{Url, ParseError};
 
 const URL_MAPPINGS_TABLE: &str = "url_mappings";
 const URL_MAPPINGS_DDSQL: &str = concatcp!(
@@ -109,7 +110,6 @@ pub struct UrlMappingInfo {
     pub duplicate_requests: i64,
     pub redirects_served: i64,
     pub marked_for_deletion: Option<String>,
-
 }
 
 impl UrlMapping {
@@ -118,6 +118,13 @@ impl UrlMapping {
             id,
             long_url,
             url_hash,
+        }
+    }
+
+    pub fn get_host(&self) -> String {
+        match Url::parse(&self.long_url) {
+            Ok(url)=> url.host_str().unwrap().to_string(),
+            Err(_) => "-err-".to_string(),
         }
     }
 
