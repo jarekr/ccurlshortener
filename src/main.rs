@@ -253,7 +253,7 @@ async fn main() {
 
     let config: &'static Config = &Config {
         hostname: "localhost",
-        port: 8443,
+        port: 8080,
         proto: "http",
     };
 
